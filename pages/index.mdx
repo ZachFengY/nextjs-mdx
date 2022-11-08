@@ -1,0 +1,120 @@
+import Image from 'next/image'
+import IMG1 from '../public/img1.png'
+import IMG2 from '../public/img2.png'
+
+export const meta = {
+  author: 'Rich Haines',
+}
+
+# WebAssembly
+
+### WebAssembly 是什么? 
+
+  WebAssembly 是一种新的、可移植的、大小和加载时间效率高的格式，适合编译到 Web 上。 <code> -- For <a target="_blank" href="https://github.com/WebAssembly/design">Webassembly Design</a></code>
+
+  WebAssembly (缩写为 Wasm)是基于堆栈的虚拟机的二进制指令格式。Wasm
+  被设计为编程语言的可移植编译目标, 使客户端和服务器应用程序能够在 Web 上部署。
+ <code> -- For <a target="_blank" href="https://webassembly.org/">Webassembly 官网</a></code>
+
+### Web 的第四种语言
+
+2019 年 12 月 5 日, WebAssembly 正式通过了 W3C 标准, 加入到了 HTML、CSS、Javascriptd 的行列, 被列为 Web 的第四种语言。
+
+<Image src={IMG2} width={800} height={300} />
+
+### Web有了Javascript了, 为什么还要WebAssembly?
+
+<Image src={IMG1} width={400} height={300} />
+
+### 特点
+
+1. 一种二进位表示的新语言, 但有另外的 text format 可以让你编辑与 debug。
+
+2. Compile Target: 顾名思义, 只要透过特定的 Compiler, 你就能将你自己惯用的语言编译成 WebAssembly, 然后执行在浏览器上！可以透过 Emscripten(LLVM to JS compiler) 来编译 C/C++ 语言。
+
+3. 提供增强 JavaScript 语言的方法: 你可以将 performance critical 的部分用 WebAssembly 撰写, 或是用第 2 点提及的 C/C++编译成 WebAssembly, 然后像一般 import js module 一般, 导入你的 JavaScript Application。透过 WebAssembly, 你能夠自由控制 Memory 的存取与释放。
+
+4. 当 Browser 能夠支援运行 WebAssembly 的時候, 由于二进制位格式以及事先编译与优化的关系, 势必能够产生比 JavaScript 运行速度更快、体积大小更小的结果。
+
+5. 语言的安全性 WebAssembly 当然也很重视, 在 JavaScript VM 中,  WebAssembly 运行在一个沙箱化的执行环境, 进入 web 端运行時会强制使用 Browser 的 Same-Origin 和 permissions security policies。此外, wasm 的设计中更特別提及他是 memory-safe 的。
+
+6. Non-Web Embeddings: 虽然是为了 Web 设计, 但也希望能在其他环境中运行, 因此底层並没有 require Web API, 让其拥有良好的 portability, 不管是 Nodejs, IoT devices 都可使用。
+
+WebAssembly 目前由 W3C Community Group 设计开发, 成员包含所有 major browsers 的代表。
+
+### wasm怎么写? format text又长什么样子?
+
+WebAssembly 的语言格式为 wasm, 举一个例子来看, 一个用 c++ 写的加法函数：
+
+add.cpp
+```
+#include <math.h>
+int add(int num1, int num2) {
+  return num1 + num2;
+}
+```
+
+若编译为 wasm 会长这个样子(转成 Hex)
+
+add.wasm
+```
+00 61 73 6d 01 00 00 00  01 87 80 80 80 00 01 60
+02 7f 7f 01 7f 03 82 80  80 80 00 01 00 04 84 80
+80 80 00 01 70 00 00 05  83 80 80 80 00 01 00 01
+06 81 80 80 80 00 00 07  95 80 80 80 00 02 06 6d
+65 6d 6f 72 79 02 00 08  5f 5a 33 61 64 64 69 69
+00 00 0a 8d 80 80 80 00  01 87 80 80 80 00 00 20
+01 20 00 6a 0b
+```
+
+当然我们很难去编辑这样的东西, 所以有另一种 text format 叫做 wast, 上述的 .wasm 转成 .wast 后：
+add.wast
+
+```
+(module
+  (table 0 anyfunc)
+  (memory $0 1)
+  (export "memory" (memory $0))
+  (export "add" (func $add))
+  (func $add (param $0 i32) (param $1 i32) (result i32)
+    (i32.add
+      (get_local $1)
+      (get_local $0)
+    )
+  )
+)
+```
+
+`line 1` 的 module 就是 WebAssembly 中一个可载入、可执行的最小单位, 在 runtime 载入后可以产生 Instance 来执行, 而这个 module 也与 ES6 modules 整合过, 也就是说能通过 `<script src="abc.wasm" type="module" />` 的方式载入。
+
+`line 2 ~ 3` 分別定义了两个预设的环境变量: memory 与 table, memory 用来存放, 而 table 则是 WebAssembly 用来存放 function reference 的地方。
+
+接着 `line 4 ~ 5` 把 memory 与 add function export 出去。之后在 JavaScript 中, 我们可以取得这两个被 export 出来的成员变量。
+
+最后是函数体內容, 其中 get_local 是 WebAssembly 中取得 memory 中 local 变量的方法。
+
+
+i32 指的就是 32位元的整数, 在 WebAssembly 的世界中, 是强类型的, 必须明确指定变量类型。
+
+### 在 JavaScript 中使用 WebAssembly 的 function
+
+```
+function instantiate(bytes, imports) {
+  return WebAssembly.compile(bytes).then(m => new WebAssembly.Instance(m, imports));
+}
+```
+使用上就是这么简单
+
+### 那能不能在 WebAssembly 中使用 JavaScript 的 function 呢？
+
+Of course! 
+
+WebAssembly.instantiate 有两个参数： 
+
+`Promise<WebAssembly.Instance> WebAssembly.instantiate(module, importObject);`
+
+`importObject` 是可以向wasm传递js方法的
+
+### 操作 Memory?
+
+### 性能比较
